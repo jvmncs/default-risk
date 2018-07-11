@@ -194,8 +194,7 @@ class PooledLSTM(nn.Module):
     def __init__(self, n_in,
                 n_out,
                 dropout=0, bidirectional=False,
-                pooling_type='average',
-                pooling_kernel=2):
+                pooling_type='adaptive-concat'):
         super(PooledLSTM, self).__init__()
         self.n_out = n_out
         self.lstm = nn.LSTM(n_in,
@@ -204,6 +203,7 @@ class PooledLSTM(nn.Module):
         self.state_dim = 2 if bidirectional else 1
 
     def forward(self, h, c):
+        # TODO pooling
         return self.lstm(h, c)
 
     def init_cell_state(self, batch_size):
