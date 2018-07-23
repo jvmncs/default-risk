@@ -5,6 +5,8 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 import time
 
+# TODO: use pytest or unittest
+
 dev = 'cpu' if not torch.cuda.is_available() else 'cuda'
 
 seq_lens = [12, 8, 4]
