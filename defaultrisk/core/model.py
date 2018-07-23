@@ -1,6 +1,6 @@
+from .layers import PooledLSTM
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 # TODO line up dimensions in Risk's forward hook
 # TODO figure out how to use pad_packed_sequences and pack_padded_sequences
@@ -71,7 +71,7 @@ class Application(nn.Module):
     Upstream modules: Bureau, PreviousApplication
     Downstream modules: None (this is the last classification module)
     """
-    def __init__(self, app_in, bureau_out, prvapp_out
+    def __init__(self, app_in, bureau_out, prvapp_out,
                 hidden=256):
         super(Application, self).__init__()
         self.app = nn.Sequential(
@@ -187,25 +187,3 @@ class CreditCardBalance(PooledLSTM):
             ccbal_in,
             ccbal_out,
             dropout=0, bidirectional=False)
-
-
-class PooledLSTM(nn.Module):
-    """A generic, concat-pooled LSTM module for use in other modules."""
-    def __init__(self, n_in,
-                n_out,
-                dropout=0, bidirectional=False,
-                pooling_type='adaptive-concat'):
-        super(PooledLSTM, self).__init__()
-        self.n_out = n_out
-        self.lstm = nn.LSTM(n_in,
-                        n_out,
-                        dropout=dropout, bidirectional=bidirectional)
-        self.state_dim = 2 if bidirectional else 1
-
-    def forward(self, h, c):
-        # TODO pooling
-        return self.lstm(h, c)
-
-    def init_cell_state(self, batch_size):
-        return nn.Parameter(
-            torch.randn(self.state_dim, batch_size, self.n_out))
