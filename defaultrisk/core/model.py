@@ -3,8 +3,8 @@ import torch
 import torch.nn as nn
 
 # TODO line up dimensions in Risk's forward hook
-# TODO figure out how to use pad_packed_sequences and pack_padded_sequences
-# TODO 
+# TODO consider unsupervised pretraining for each module
+# TODO figure out per-module masking
 
 class Risk(nn.Module):
     """

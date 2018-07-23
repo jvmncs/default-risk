@@ -45,6 +45,8 @@ for i in range(100000):
     tap = torch.sum(padded, dim=0)/lengths.view(-1,1)
 truepool_time = time.time() - time1
 
+# TODO test concat pooling here
+
 for i in range(len(seqs)):
     assert true_mean[i].item() == -.5
     assert true_max[i].item() == - 1
