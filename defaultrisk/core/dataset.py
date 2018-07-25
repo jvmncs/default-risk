@@ -55,16 +55,16 @@ class RiskDataset(Dataset):
         x_app = self.app[ix] # should have size (1, na)
 
         # get BureauDataset instance
-        bureau_sampler = self.bureau.make_sampler(self.app.bureau_map[ix])
+        bureau_indices = self.app.bureau_map[ix]
         x_bureau = []
         x_burbal = []
-        for jx in bureau_sampler:
+        for jx in bureau_indices:
             x_bureau.append(self.bureau[jx])
 
         # get BureauBalanceDataset instance
-            burbal_sampler = self.burbal.make_sampler(self.bureau.burbal_map[ix][jx])
+            burbal_indices = self.bureau.burbal_map[jx]
             xi_burbal = []
-            for kx in burbal_sampler:
+            for kx in burbal_indices:
                 xi_burbal.append(self.burbal[kx]) # TODO confirm size of each tensor in xi_burbal is (1, 1, nb)
             xi_burbal = torch.cat(xi_burbal) # should have size (bb, 1, nb)
             x_burbal.append(xi_burbal) # TODO confirm size of each tensor in x_burbal is (bb, 1, nb)
