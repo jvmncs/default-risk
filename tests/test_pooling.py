@@ -5,6 +5,11 @@ import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 import time
 
+<<<<<<< HEAD
+=======
+# TODO: use pytest or unittest
+
+>>>>>>> f407cec706f8beb5c2d972dc9c14f2551e4cea96
 dev = 'cpu' if not torch.cuda.is_available() else 'cuda'
 
 seq_lens = [12, 8, 4]
@@ -45,6 +50,11 @@ for i in range(100000):
     tap = torch.sum(padded, dim=0)/lengths.view(-1,1)
 truepool_time = time.time() - time1
 
+<<<<<<< HEAD
+=======
+# TODO test concat pooling here
+
+>>>>>>> f407cec706f8beb5c2d972dc9c14f2551e4cea96
 for i in range(len(seqs)):
     assert true_mean[i].item() == -.5
     assert true_max[i].item() == - 1
