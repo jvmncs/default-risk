@@ -12,15 +12,15 @@ from torch.utils.data import Dataset
 #   |---|---|InstallmentsPaymentsDataset
 #   |---|---|CreditCardBalanceDataset
 
-# After collating, Dimensions of each instance in RiskDataset
-# for each Module in Risk model should be:
-#   Application:            (a, na) where a is batch size (num current apps), na is number of features
-#   Bureau:                 (b, a, nb) where b is num bureau apps, nb is num features per bureau app
-#   BureauBalance:          (a, bb, b, nbb) where bb is num balances per bureau app, nbb is num features per balance
-#   PreviousApplication:    (p, a, np) where p is num prev apps, np is num features per prev app
-#   POSCashBalance:         (a, pc, p, npc) where pc is num pos balances per prev app, npc is num features per balance
-#   InstallmentsPayments:   (a, ip, p, nip) where ip is num payments per prev app, nip is num features per payment
-#   CreditCardBalance:      (a, c, p, nc) where c is num cc balances per prev app, nc is num features per cc balance
+# After collating, an instance in RiskDataset
+# should have a specific tensor for each Module in our Risk model.
+#   Application:            x_app, of size (a, na), where a is batch size (num current apps), na is number of features
+#   Bureau:                 x_bureau, of size (b, a, nb), where b is num bureau apps, nb is num features per bureau app
+#   BureauBalance:          x_burbal, of size (a, bb, b, nbb), where bb is num balances per bureau app, nbb is num features per balance
+#   PreviousApplication:    x_prvapp, of size (p, a, np), where p is num prev apps, np is num features per prev app
+#   POSCashBalance:         x_pos, of size (a, pc, p, npc), where pc is num pos balances per prev app, npc is num features per balance
+#   InstallmentsPayments:   x_instpay, of size (a, ip, p, nip), where ip is num payments per prev app, nip is num features per payment
+#   CreditCardBalance:      x_ccbal, of size (a, c, p, nc), where c is num cc balances per prev app, nc is num features per cc balance
 
 
 # TODO: create a custom Sampler for each non-root Dataset that collates according to it's child(ren)'s index map,
