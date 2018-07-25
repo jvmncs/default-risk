@@ -1,11 +1,22 @@
 import torch
 from torch.utils.data import Dataset
 
+# For reference, the following classes form a tree of Datasets, mirroring the tree-like relationship
+# of the CSVs, as shown in the diagram here https://www.kaggle.com/c/home-credit-default-risk/data
+# Specifically, the tree is as follows:
+#   |ApplicationDataset
+#   |---|BureauDataset
+#   |---|---|BureauBalanceDataset
+#   |---|PreviousApplicationsDataset
+#   |---|---|POSCashBalanceDataset
+#   |---|---|InstallmentsPaymentsDataset
+#   |---|---|CreditCardBalanceDataset
+
 # After collating, Dimensions of each instance in RiskDataset
 # for each Module in Risk model should be:
 #   Application:            (a, na) where a is batch size (num current apps), na is number of features
 #   Bureau:                 (b, a, nb) where b is num bureau apps, nb is num features per bureau app
-#   BureauBal:              (a, bb, b, nbb) where bb is num balances per bureau app, nbb is num features per balance
+#   BureauBalance:          (a, bb, b, nbb) where bb is num balances per bureau app, nbb is num features per balance
 #   PreviousApplication:    (p, a, np) where p is num prev apps, np is num features per prev app
 #   POSCashBalance:         (a, pc, p, npc) where pc is num pos balances per prev app, npc is num features per balance
 #   InstallmentsPayments:   (a, ip, p, nip) where ip is num payments per prev app, nip is num features per payment
