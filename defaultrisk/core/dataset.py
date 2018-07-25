@@ -26,7 +26,8 @@ class RiskDataset(Dataset):
     """
     def __init__(self, app, bureau, burbal, prvapp, pos, instpay, ccbal):
         super(RiskDataset, self).__init__()
-        self.app = app
+        self.app = app[:, :-1]
+        self.y = app[:, -1]
         self.bureau = bureau
         self.burbal = burbal
         self.prvapp = prvapp
@@ -40,7 +41,33 @@ class RiskDataset(Dataset):
         In our case, a single instance consists of a single applicant, along with
         all other sequences from other tables that are related to that applicant.
         """
-        return # TODO
+        x_app = self.app[ix] # should have size (1, na)
+
+        # get BureauDataset instance
+        bureau_sampler = self.bureau.make_sampler(self.app.bureau_map[ix])
+        x_bureau = []
+        x_burbal = []
+        for jx in bureau_sampler:
+            x_bureau.append(self.bureau[jx])
+
+        # get BureauBalanceDataset instance
+            burbal_sampler = self.burbal.make_sampler(self.bureau.burbal_map[ix][jx])
+            xi_burbal = []
+            for kx in burbal_sampler:
+                xi_burbal.append(self.burbal[kx]) # TODO confirm size of each tensor in xi_burbal is (1, 1, nb)
+            xi_burbal = torch.cat(xi_burbal) # should have size (bb, 1, nb)
+            x_burbal.append(xi_burbal) # TODO confirm size of each tensor in x_burbal is (bb, 1, nb)
+        x_burbal = torch.cat(x_burbal, dim=1).unsqueeze(0) # should have size (1, bb, b, nb)
+
+        # TODO get PreviousApplicationDataset instance
+
+        # TODO get POSCashBalanceDataset instance
+
+        # TODO get InstallmentsPaymentsDataset instance
+        
+        # TODO get CreditCardBalance instancesDataset instance
+
+        return (x_app, x_bureau, x_prvapp, x_burbal, x_pos, x_instpay, x_ccbal), y[ix]
 
     def __len__(self):
         """Obligatory Dataset __len__ magic method.
