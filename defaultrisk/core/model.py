@@ -142,7 +142,7 @@ class POSCashBalance(PooledLSTM):
     """A module learning from monthly balances of previous point of
     sales and cash loans with Home Credit.
 
-    Table: POS_CASH_balance.csv
+    Table: POS_CASH_b/alance.csv
     Upstream modules: None
     Downstream modules: PreviousApplication
     """
