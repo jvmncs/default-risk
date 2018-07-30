@@ -1,15 +1,12 @@
-from defaultrisk.core.layers import concatpool
+from defaultrisk.core.layers import PooledLSTM
 
 import torch
 import torch.nn as nn
 from torch.nn.utils.rnn import pad_sequence
 import time
 
-<<<<<<< HEAD
-=======
 # TODO: use pytest or unittest
 
->>>>>>> f407cec706f8beb5c2d972dc9c14f2551e4cea96
 dev = 'cpu' if not torch.cuda.is_available() else 'cuda'
 
 seq_lens = [12, 8, 4]
@@ -39,29 +36,36 @@ padded_max = pad_sequence(max_seqs).unsqueeze(-1)
 
 # Naive average pooling
 time0 = time.time()
-for i in range(100000):
+for i in range(20000):
     nap = nn.functional.adaptive_avg_pool1d(padded.permute(1, 2, 0), 1) # input is (batch, features, sequence)
 naive_time = time.time() - time0
 
 # Variable-length average pooling
 lengths = torch.tensor(seq_lens, dtype=torch.float, device=dev)
 time1 = time.time()
-for i in range(100000):
+for i in range(20000):
     tap = torch.sum(padded, dim=0)/lengths.view(-1,1)
 truepool_time = time.time() - time1
 
-<<<<<<< HEAD
-=======
-# TODO test concat pooling here
+def test_poolingvarlen():
+    for i in range(len(seqs)):
+        assert true_mean[i].item() == -.5
+        assert true_mean[i].item() == tap[i].squeeze().item()
+        if i != 0:
+            assert true_mean[i].item() != nap[i].squeeze().item()
+        else:
+            assert true_mean[i].item() == nap[i].squeeze().item()
 
->>>>>>> f407cec706f8beb5c2d972dc9c14f2551e4cea96
-for i in range(len(seqs)):
-    assert true_mean[i].item() == -.5
-    assert true_max[i].item() == - 1
-    assert true_mean[i].item() == tap[i].squeeze().item()
-    if i != 0:
-        assert true_mean[i].item() != nap[i].squeeze().item()
-    else:
-        assert true_mean[i].item() == nap[i].squeeze().item()
-    print(true_mean[i].item(), tap[i].squeeze().item(), nap[i].squeeze().item())
+def test_poolingtime():
     assert truepool_time < 1.2 * naive_time
+
+def test_concatpoolingtruth():
+    nmp = nn.functional.adaptive_max_pool1d(padded.permute(1,2,0), 1)
+    p = PooledLSTM.concatpool(padded, lengths)
+    # TODO
+
+test_concatpoolingtruth()
+
+def test_concatpoolingshape():
+    # TODO
+    pass

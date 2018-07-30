@@ -2,3 +2,4 @@ data/*.csv
 dist/
 build/
 *__pycache__*
+.pytest_cache/
