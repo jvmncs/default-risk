@@ -20,6 +20,8 @@ from scipy.stats import uniform
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
+parser.add_argument('--test-split', type=float, dest="test_split", default=0.2, metavar='N',
+                    help='split into train and test sets')
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
@@ -35,22 +37,18 @@ args.cuda = not args.no_cuda and torch.cuda.is_available()
 
 torch.manual_seed(args.seed)
 
+device = torch.cuda.current_device()
+
 if args.cuda:
     # Horovod: pin GPU to local rank.
-    torch.cuda.set_device("cuda")
+    torch.cuda.set_device(device)
     torch.cuda.manual_seed(args.seed)
-
-if args.cuda:
-    # Move model to GPU.
-    model.cuda()
-
 
 # average score to report
 # FIXME: need to update this
 def metric_average(val, name):
     tensor = torch.FloatTensor([val])
-    avg_tensor = hvd.allreduce(tensor, name=name)
-    return avg_tensor.data[0]
+    return tensor.data[0]
 
 def prepare_data():
     """Prepare Kaggle version of MNIST dataset with optional validation split"""
@@ -71,7 +69,7 @@ def prepare_data():
     indices = np.arange(num_train)
     mask = np.random.sample(num_train) < args.test_split
     other_ix = indices[~mask]
-    other_mask = np.random.sample(np.sum(~mask)) < args.train_split
+    other_mask = np.random.sample(np.sum(~mask)) < (1 - args.test_split)
     train_ix = other_ix[other_mask]
     test_ix = indices[mask]
     if not np.all(other_mask):
@@ -107,10 +105,10 @@ class Net(nn.Module):
 # Update this to use ray
 ray.init()
           
-def train(config, reporter):
+def train(config, reporter, **kwargs):
     
-    model = Net()
-
+    model = Net().to(device)
+    
     train_sampler, test_sampler, train_dataset, test_dataset = prepare_data()
 
     train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=train_sampler, **kwargs)
@@ -118,7 +116,7 @@ def train(config, reporter):
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size, sampler=test_sampler, **kwargs)
 
     for epoch in range(1, args.epochs + 1):
-        model = ConvNet().to(device)
+        
         optimizer = optim.SGD(model.parameters(), lr=config["lr"],
                     momentum=config["momentum"])
 
