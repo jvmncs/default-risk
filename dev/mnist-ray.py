@@ -27,13 +27,13 @@ parser.add_argument('--validation-split', dest="val_split", type=float, default=
                     help="size for validation set (default: 0.2)")
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=10, metavar='N',
+parser.add_argument('--epochs', type=int, default=1, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--no-cuda', action='store_true', default=True,
                     help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=42, metavar='S',
                     help='random seed (default: 42)')
-parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+parser.add_argument('--log-interval', type=int, default=100, metavar='N',
                     help='how many batches to wait before logging training status')
 parser.add_argument('--download', type=bool, default=True, 
                     help='disables download data')
@@ -45,7 +45,6 @@ parser.add_argument('--checkpoint', type=str, default='checkpoint/', metavar='PA
 args = parser.parse_args()
 
 # average score to report
-# FIXME: need to update this
 def metric_average(val, name):
     tensor = torch.FloatTensor([val])
     return tensor.data[0]
@@ -275,13 +274,14 @@ def train(config, reporter):
         print('Final model stored at "{}".'.format(checkpoint_file + '-best.pth.tar'))
         
 
-tune.register_trainable("train_func", train)
+tune.register_trainable("train", train)
 
 
 all_trials = tune.run_experiments({
     "awesome": {
-        "run": "train_func",
-        "stop": {"mean_accuracy": 9},
+        "run": "train",
+        "repeat": 1,
+        # "stop": {"mean_accuracy": 0.8},
         "config": {
             "lr": tune.grid_search(list(uniform.rvs(0, size=2))),
             "momentum": tune.grid_search(list(uniform.rvs(0, size=2))),
