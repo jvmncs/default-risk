@@ -35,11 +35,13 @@ parser.add_argument('--seed', type=int, default=42, metavar='S',
                     help='random seed (default: 42)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
-parser.add_argument('--data-dir', type=str, default="./data/", metavar='PATH', 
-                    help="root path for folder containing training data (default: ./data/")
-parser.add_argument('--checkpoint', type=str, default='./checkpoint/', metavar='PATH',
+parser.add_argument('--download', type=bool, default=True, 
+                    help='disables download data')
+parser.add_argument('--data', type=str, default="data/", metavar='PATH', 
+                    help="root path for folder containing training data (default: data/")
+parser.add_argument('--checkpoint', type=str, default='checkpoint/', metavar='PATH',
                         help='root path for folder containing model checkpoints \
-                        (default: ./checkpoint/)')
+                        (default: checkpoint/)')
 args = parser.parse_args()
 
 # average score to report
@@ -48,20 +50,20 @@ def metric_average(val, name):
     tensor = torch.FloatTensor([val])
     return tensor.data[0]
 
-def prepare_data(**kwargs):
+def prepare_data(data=args.data, download=args.download, **kwargs):
     """Prepare Kaggle version of MNIST dataset with optional validation split"""
-    train_dataset = datasets.MNIST("data", train=True, 
+    train_dataset = datasets.MNIST(root=data, train=True, download=download,
                     transform=transforms.Compose([
-                        transforms.ToTensor(),
-                        transforms.Normalize((0.1307,), (0.3081,))
-                    ]), **kwargs)
-
-    validate_dateset = datasets.MNIST("data", train=True, transform=transforms.Compose([
                         transforms.ToTensor(),
                         transforms.Normalize((0.1307,), (0.3081,))
                     ]))
 
-    test_dataset = datasets.MNIST("data", train=False, transform=transforms.Compose([
+    validate_dateset = datasets.MNIST(root=data, train=True, transform=transforms.Compose([
+                        transforms.ToTensor(),
+                        transforms.Normalize((0.1307,), (0.3081,))
+                    ]))
+
+    test_dataset = datasets.MNIST(root=data, train=False, transform=transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))
         ]))
@@ -126,7 +128,7 @@ class Net(nn.Module):
 # Update this to use ray
 ray.init()
           
-def train(config, reporter, **kwargs):
+def train(config, reporter):
     
     # reproducibility
     # need to seed numpy/torch random number generators
@@ -138,10 +140,8 @@ def train(config, reporter, **kwargs):
     if not os.path.isdir(args.data):
         mkdir_p(args.data)
     
-    if not os.path.exists(args.data + "processed/training.pt") and os.path.exists(args.data + "processed/test.pt"):
-        download=True
-    else: 
-        download=False
+    if os.path.exists(args.data + "processed/training.pt") and os.path.exists(args.data + "processed/test.pt"):
+        args.download=False
 
     # need directory with checkpoint files to recover previously trained models
     if not os.path.isdir(args.checkpoint):
@@ -154,8 +154,7 @@ def train(config, reporter, **kwargs):
     device = torch.device("cuda" if args.cuda else "cpu") 
 
     # prep data loaders
-    kwargs = {'download': download}
-    train_loader, val_loader, test_loader = prepare_data(**kwargs)
+    train_loader, val_loader, test_loader = prepare_data()
 
     # build model
     model = Net().to(device)
@@ -284,8 +283,8 @@ all_trials = tune.run_experiments({
         "run": "train_func",
         "stop": {"mean_accuracy": 9},
         "config": {
-            "lr": tune.grid_search(list(uniform.rvs(0, size=20))),
-            "momentum": tune.grid_search(list(uniform.rvs(0, size=20))),
+            "lr": tune.grid_search(list(uniform.rvs(0, size=2))),
+            "momentum": tune.grid_search(list(uniform.rvs(0, size=2))),
         }
     }
 })
