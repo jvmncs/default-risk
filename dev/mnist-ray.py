@@ -1,8 +1,11 @@
 from __future__ import print_function
 import argparse
 
-import numpy as np
+import os
+import shutil
+from datetime import datetime
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -20,29 +23,24 @@ from scipy.stats import uniform
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
                     help='input batch size for training (default: 64)')
-parser.add_argument('--test-split', type=float, dest="test_split", default=0.2, metavar='N',
-                    help='split into train and test sets')
+parser.add_argument('--validation-split', dest="val_split", type=float, default=0.2, 
+                    help="size for validation set (default: 0.2)")
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
 parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
-parser.add_argument('--no-cuda', action='store_true', default=False,
+parser.add_argument('--no-cuda', action='store_true', default=True,
                     help='disables CUDA training')
 parser.add_argument('--seed', type=int, default=42, metavar='S',
                     help='random seed (default: 42)')
 parser.add_argument('--log-interval', type=int, default=10, metavar='N',
                     help='how many batches to wait before logging training status')
+parser.add_argument('--data-dir', type=str, default="./data/", metavar='PATH', 
+                    help="root path for folder containing training data (default: ./data/")
+parser.add_argument('--checkpoint', type=str, default='./checkpoint/', metavar='PATH',
+                        help='root path for folder containing model checkpoints \
+                        (default: ./checkpoint/)')
 args = parser.parse_args()
-args.cuda = not args.no_cuda and torch.cuda.is_available()
-
-torch.manual_seed(args.seed)
-
-device = torch.cuda.current_device()
-
-if args.cuda:
-    # Horovod: pin GPU to local rank.
-    torch.cuda.set_device(device)
-    torch.cuda.manual_seed(args.seed)
 
 # average score to report
 # FIXME: need to update this
@@ -50,10 +48,15 @@ def metric_average(val, name):
     tensor = torch.FloatTensor([val])
     return tensor.data[0]
 
-def prepare_data():
+def prepare_data(**kwargs):
     """Prepare Kaggle version of MNIST dataset with optional validation split"""
-    train_dataset = datasets.MNIST("data", train=True, download=True,
+    train_dataset = datasets.MNIST("data", train=True, 
                     transform=transforms.Compose([
+                        transforms.ToTensor(),
+                        transforms.Normalize((0.1307,), (0.3081,))
+                    ]), **kwargs)
+
+    validate_dateset = datasets.MNIST("data", train=True, transform=transforms.Compose([
                         transforms.ToTensor(),
                         transforms.Normalize((0.1307,), (0.3081,))
                     ]))
@@ -67,22 +70,40 @@ def prepare_data():
     # From https://github.com/jvmancuso/cle-mnist/blob/master/prepare_data.py
     num_train = len(train_dataset)
     indices = np.arange(num_train)
-    mask = np.random.sample(num_train) < args.test_split
+    mask = np.random.sample(num_train) < args.val_split
+
     other_ix = indices[~mask]
-    other_mask = np.random.sample(np.sum(~mask)) < (1 - args.test_split)
+    other_mask = np.random.sample(np.sum(~mask)) < (1-args.val_split)
+    
     train_ix = other_ix[other_mask]
-    test_ix = indices[mask]
-    if not np.all(other_mask):
-        val_ix = other_ix[~other_mask]
-    else:
-        val_ix = None
-
-
+    val_ix = indices[mask]
+    test_ix = np.arange(len(test_dataset))
+    
     train_sampler = SubsetRandomSampler(train_ix)
-
+    val_sampler = SubsetRandomSampler(val_ix)
     test_sampler = SubsetRandomSampler(test_ix)
 
-    return train_sampler, test_sampler, train_dataset, test_dataset
+    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=train_sampler, **kwargs)
+    val_loader = torch.utils.data.DataLoader(validate_dateset, batch_size=args.test_batch_size, sampler=val_sampler, **kwargs)
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size, sampler=test_sampler, **kwargs)
+
+    return train_loader, val_loader, test_loader
+
+def mkdir_p(path):
+    '''make dir if not exist'''
+    try:
+        os.makedirs(path)
+    except OSError as exc:  # Python >2.5
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+def save_checkpoint(state, is_best, title, filename='checkpoint.pth.tar'):
+    filepath = title + '-' + filename
+    torch.save(state, filepath)
+    if is_best:
+        shutil.copyfile(filepath, title + '-best.pth.tar')
 
 class Net(nn.Module):
     def __init__(self):
@@ -107,58 +128,153 @@ ray.init()
           
 def train(config, reporter, **kwargs):
     
-    model = Net().to(device)
+    # reproducibility
+    # need to seed numpy/torch random number generators
+    if args.seed is not None:
+        torch.manual_seed(args.seed)
+        np.random.seed(args.seed)
+
+    # need to figure out if downloaded data before
+    if not os.path.isdir(args.data):
+        mkdir_p(args.data)
     
-    train_sampler, test_sampler, train_dataset, test_dataset = prepare_data()
+    if not os.path.exists(args.data + "processed/training.pt") and os.path.exists(args.data + "processed/test.pt"):
+        download=True
+    else: 
+        download=False
 
-    train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=args.batch_size, sampler=train_sampler, **kwargs)
+    # need directory with checkpoint files to recover previously trained models
+    if not os.path.isdir(args.checkpoint):
+        mkdir_p(args.checkpoint)
+    
+    checkpoint_file = args.checkpoint + "net" + str(datetime.now())[:-10]
+    
+    # decide which device to use; assumes at most one GPU is available
+    args.cuda = not args.no_cuda and torch.cuda.is_available()
+    device = torch.device("cuda" if args.cuda else "cpu") 
 
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=args.test_batch_size, sampler=test_sampler, **kwargs)
+    # prep data loaders
+    kwargs = {'download': download}
+    train_loader, val_loader, test_loader = prepare_data(**kwargs)
 
-    for epoch in range(1, args.epochs + 1):
+    # build model
+    model = Net().to(device)
+    kwargs = {'num_workers': 2} # specifies number of subprocesses to use for loading data
+    
+    # build optimizer
+    optimizer = optim.SGD(model.parameters(), lr=config["lr"], momentum=config["momentum"])
+
+     # setup validation metrics we want to track for tracking best model over training run
+    best_val_loss = float('inf')
+    best_val_acc = 0
+
+    for epoch in range(1, args.epochs + 1):        
+        print('\n================== TRAINING ==================')
+        model.train() # set model to training mode
+
+        # set up training metrics we want to track
+        correct = 0
+        train_num = len(train_loader.sampler)
         
-        optimizer = optim.SGD(model.parameters(), lr=config["lr"],
-                    momentum=config["momentum"])
-
-        model.train()
-        
-        for idx, (img, label) in enumerate(train_loader):
+        for batch_idx, (img, label) in enumerate(train_loader):
             img, label = img.to(device), label.to(device)
             optimizer.zero_grad()
             output = model(img)
             loss = F.cross_entropy(output, label)
             loss.backward()
             optimizer.step()
-            
-            if batch_idx % args.log_interval == 0:
+
+            pred = output.max(1, keepdim=True)[1] # get the index of the max logit
+            correct += pred.eq(label.view_as(pred)).sum().item() # add to running total of hits
+
+            if batch_idx % args.log_interval == 0: # maybe log current metrics to terminal
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_sampler),
-                100. * batch_idx / len(train_loader), loss.data[0]))
+                    epoch, (batch_idx + 1) * len(img), train_num,
+                    100. * batch_idx / len(train_loader), loss.item()))
 
-                model.eval()
-                test_loss = 0.
-                test_accuracy = 0.
+        # print whole epoch's training accuracy; useful for monitoring overfitting
+        print('Train Accuracy: {}/{} ({:.0f}%)\n'.format(
+            correct, train_num, 100. * correct / train_num))
 
-                for data, target in test_loader:
-                    if args.cuda:
-                        data, target = data.cuda(), target.cuda()
-                    data, target = Variable(data, volatile=True), Variable(target)
-                    output = model(data)
-                    # sum up batch loss
-                    test_loss += F.nll_loss(output, target, size_average=False).data[0]
-                    # get the index of the max log-probability
-                    pred = output.data.max(1, keepdim=True)[1]
-                    test_accuracy += pred.eq(target.data.view_as(pred)).cpu().float().sum()
+        print('\n================== VALIDATION ==================')
+        model.eval() # set model to evaluate mode
 
-                test_loss /= len(test_sampler)
-                test_accuracy /= len(test_sampler)
+        # set up validation metrics we want to track
+        val_loss = 0.
+        val_correct = 0
+        val_num = len(val_loader.sampler)
 
-                test_loss = metric_average(test_loss, 'avg_loss')
-                test_accuracy = metric_average(test_accuracy, 'avg_accuracy')
+        # disable autograd here (replaces volatile flag from v0.3.1 and earlier)
+        with torch.no_grad():
+            # loop over validation batches
+            for img, label in val_loader:
+                img, label = img.to(device), label.to(device) # get data, send to gpu if needed
+                output = model(img) # forward pass
 
-                reporter(timesteps_total=idx,
-                    mean_accuracy = test_accuracy)
+                # sum up batch loss
+                val_loss += F.cross_entropy(output, label, size_average=False).item()
 
+                # monitor for accuracy
+                pred = output.max(1, keepdim=True)[1] # get the index of the max logit
+                val_correct += pred.eq(label.view_as(pred)).sum().item() # add to total hits
+
+        # update current evaluation metrics
+        val_loss /= val_num
+        val_acc = 100. * val_correct / val_num
+        print('\nValidation set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+            val_loss, val_correct, val_num, val_acc))
+
+        # check if best model according to accuracy;
+        # if so, replace best metrics
+        is_best = val_acc > best_val_acc
+        if is_best:
+            best_val_acc = val_acc
+            best_val_loss = val_loss # note this is val_loss of best model w.r.t. accuracy,
+                                        # not the best val_loss throughout training
+
+        # create checkpoint dictionary and save it;
+        # if is_best, copy the file over to the file containing best model for this run
+        state = {
+            'epoch': epoch,
+            'model': "Net",
+            'state_dict': model.state_dict(),
+            'optimizer_state': optimizer.state_dict(),
+            'val_loss': val_loss,
+            'best_val_loss': best_val_loss,
+            'val_acc': val_acc,
+            'best_val_acc': best_val_acc
+        }
+
+        save_checkpoint(state, is_best, checkpoint_file)    
+
+        print('\n================== TESTING ==================')
+        # load best model from training run (according to validation accuracy)
+        check = torch.load(checkpoint_file + '-best.pth.tar')
+        model.load_state_dict(check['state_dict'])
+        model.eval() # set model to evaluate mode
+
+        # set up evaluation metrics we want to track
+        test_loss = 0.
+        test_correct = 0
+        test_num = len(test_loader.sampler)
+
+        # disable autograd here (replaces volatile flag from v0.3.1 and earlier)
+        with torch.no_grad():
+            for img, label in test_loader:
+                img, label = img.to(device), label.to(device)
+                output = model(img)
+                # sum up batch loss
+                test_loss += F.cross_entropy(output, label, size_average=False).item()
+                pred = output.max(1, keepdim=True)[1] # get the index of the max logit
+                test_correct += pred.eq(label.view_as(pred)).sum().item()
+
+        test_loss /= test_num
+        print('Test set: Average loss: {:.4f}, Accuracy: {}/{} ({:.0f}%)\n'.format(
+            test_loss, test_correct, test_num,
+            100. * test_correct / test_num))
+
+        print('Final model stored at "{}".'.format(checkpoint_file + '-best.pth.tar'))
+        
 
 tune.register_trainable("train_func", train)
 
