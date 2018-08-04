@@ -44,6 +44,9 @@ parser.add_argument('--checkpoint', type=str, default='checkpoint/', metavar='PA
                         (default: checkpoint/)')
 args = parser.parse_args()
 
+args.data = os.getcwd() + '/' + args.data
+args.checkpoint = os.getcwd() + '/' + args.checkpoint
+
 # average score to report
 def metric_average(val, name):
     tensor = torch.FloatTensor([val])
