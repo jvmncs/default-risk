@@ -1,0 +1,5 @@
+matplotlib
+pandas
+sklearn
+numpy
+scipy
