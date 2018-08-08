@@ -19,6 +19,8 @@ import ray.tune as tune
 
 from scipy.stats import uniform
 
+# todo: figure out how to direct logs into a dir in this path instead of at root
+# todo: fix download flag so it doesn't download when file already there
 # Training settings
 parser = argparse.ArgumentParser(description='PyTorch MNIST Example')
 parser.add_argument('--batch-size', type=int, default=64, metavar='N',
@@ -27,7 +29,7 @@ parser.add_argument('--validation-split', dest="val_split", type=float, default=
                     help="size for validation set (default: 0.2)")
 parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                     help='input batch size for testing (default: 1000)')
-parser.add_argument('--epochs', type=int, default=1, metavar='N',
+parser.add_argument('--epochs', type=int, default=10, metavar='N',
                     help='number of epochs to train (default: 10)')
 parser.add_argument('--no-cuda', action='store_true', default=True,
                     help='disables CUDA training')
@@ -128,8 +130,13 @@ class Net(nn.Module):
         return F.log_softmax(x)
 
 # Update this to use ray
-ray.init()
-          
+# ray.init()
+ray.init(node_ip_address="127.0.0.1")
+
+r = ray.worker.global_worker.redis_client
+print(r.config_get('maxclients'))
+print(r.info('clients'))  # What does this print?
+
 def train(config, reporter):
     
     # reproducibility
@@ -192,6 +199,7 @@ def train(config, reporter):
                 print('Train Epoch: {} [{}/{} ({:.0f}%)]\tLoss: {:.6f}'.format(
                     epoch, (batch_idx + 1) * len(img), train_num,
                     100. * batch_idx / len(train_loader), loss.item()))
+
 
         # print whole epoch's training accuracy; useful for monitoring overfitting
         print('Train Accuracy: {}/{} ({:.0f}%)\n'.format(
@@ -276,6 +284,10 @@ def train(config, reporter):
 
         print('Final model stored at "{}".'.format(checkpoint_file + '-best.pth.tar'))
         
+        reporter(
+            epoch=epoch,
+            train_loss=loss.item(),
+            best_test_acc=100. * test_correct / test_num) # report metrics
 
 tune.register_trainable("train", train)
 
@@ -284,11 +296,23 @@ all_trials = tune.run_experiments({
     "awesome": {
         "run": "train",
         "repeat": 1,
-        # "stop": {"mean_accuracy": 0.8},
+        # "trial_resources": {
+        #     "cpu": 8, 
+        #     "gpu": 1,
+        # },
+        "stop": {
+            "best_test_acc": 90,
+         },
+        #"stop": {"epoch": 1},
         "config": {
-            "lr": tune.grid_search(list(uniform.rvs(0, size=2))),
-            "momentum": tune.grid_search(list(uniform.rvs(0, size=2))),
-        }
+            "lr": tune.grid_search(list(uniform.rvs(0, size=3))),
+            "momentum": tune.grid_search(list(uniform.rvs(0, size=1))),
+        },
+        "local_dir": "ray_results",
+        "max_failures": 1
     }
 })
 
+ray.error_info()
+
+ray.global_state.log_files()
