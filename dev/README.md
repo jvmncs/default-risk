@@ -4,5 +4,13 @@ Folder for exploratory analysis and development.  If you do an analysis or write
 
 ray
 =======
-pip install -r requirements.txt
+
+pip users:
+
+```pip install -r requirements.txt```
+
+Anaconda users:
+
+```conda env create -f default-risk.yml```
+
 python dev/mnist-ray.py
