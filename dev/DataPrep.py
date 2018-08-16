@@ -114,7 +114,9 @@ class DataSetProto(DataSet):
                     if config['select_features']:
                         nfeats = list(get_feats(self.data).keys())
                         self.data = self.data[nfeats]
-                continue
+                except:
+                    pass
+                pass
         
         self.data = torch.tensor(self.data.values,dtype=torch.float32)
         
