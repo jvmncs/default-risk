@@ -23,20 +23,40 @@ def clean(df):
     return df
 
 def calc_n_feats(fname):
-    train = clean(pd.read_csv(fname).fillna(.0))     
+    '''
+        perfom PCA on dataset
+        then calculate where the curve on the explained variance with the largest distance between points
+
+        NOTE: using aic or bic might work better
+            - https://en.wikipedia.org/wiki/Bayesian_information_criterion
+            - https://en.wikipedia.org/wiki/Akaike_information_criterion
+            - https://stats.stackexchange.com/questions/577/is-there-any-reason-to-prefer-the-aic-or-bic-over-the-other
+
+        maybe even MDL - https://en.wikipedia.org/wiki/Minimum_description_length
+
+        I don't know
+    '''
+    train = clean(pd.read_csv(fname).fillna(.0)) 
     targets = train['TARGET']
-    del train['TARGET']   
+    # remove targets 
+    del train['TARGET']  
+
     pca = PCA(n_components=len(train.T))
     scaled = pd.DataFrame(preprocessing.scale(train),columns = train.columns) 
     pca.fit_transform(scaled)
+
     arr = pca.explained_variance_ratio_
+    
     nPoints = len(arr)
-    allCoord = np.vstack((range(nPoints), curve)).T
-    np.array([range(nPoints), curve])
-    firstPoint = allCoord[0]
-    lineVec = allCoord[-1] - allCoord[0]
+    
+    allCoords = np.vstack((range(nPoints), arr)).T
+    
+    # enumerate vector
+    np.array([range(nPoints), arr])
+    firstPoint = allCoords[0]
+    lineVec = allCoords[-1] - allCoords[0]
     lineVecNorm = lineVec / np.sqrt(np.sum(lineVec**2))
-    vecFromFirst = allCoord - firstPoint
+    vecFromFirst = allCoords - firstPoint
     scalarProduct = np.sum(vecFromFirst * np.matlib.repmat(lineVecNorm, nPoints, 1), axis=1)
     vecFromFirstParallel = np.outer(scalarProduct, lineVecNorm)
     vecToLine = vecFromFirst - vecFromFirstParallel
@@ -55,7 +75,7 @@ def get_feats(train,nfeats=None,to_disk=False):
 
     if not nfeats:
         nfeats = calc_n_feats(train)
-        
+
     mi = mutual_info_classif(train,targets)
     table = dict(zip(train.columns.values,mi))
     best = sorted(table, key=table.get, reverse=True)
