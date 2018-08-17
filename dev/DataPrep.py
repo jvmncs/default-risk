@@ -113,7 +113,7 @@ class DataSetProto(DataSet):
                 try:
                     if config['select_features']:
                         nfeats = list(get_feats(self.data).keys())
-                        self.data = self.data[nfeats]
+                        self.data = self.data[:nfeats]
                 except:
                     pass
                 pass
