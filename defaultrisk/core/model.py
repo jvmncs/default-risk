@@ -3,8 +3,12 @@ import torch
 import torch.nn as nn
 
 # TODO line up dimensions in Risk's forward hook
+# TODO figure out per-module masking (dataset should be made to have binary feature
+#      that can be multiplied onto each module's output to mask its output.  Then arbitrary
+#      input data can be used for that module without affecting gradient propagation.
+# TODO Replace Bureau and PreviousApplication with Bag of Conv1ds with small kernel sizes (e.g. bag of 1, 2, 3)
+# TODO Experiment with Temporal Convolutional Module https://github.com/locuslab/TCN
 # TODO consider unsupervised pretraining for each module
-# TODO figure out per-module masking
 
 class Risk(nn.Module):
     """
