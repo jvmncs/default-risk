@@ -1,4 +1,8 @@
 # default-risk
+A potential solution to the [Home Credit Kaggle competition](https://www.kaggle.com/c/home-credit-default-risk) based on neural risk modeling.
+
+### N.B.
+Unfortunately, our team was unable to complete our ambitious solution to the competition given our hectic personal schedules.  We want to see someone pick up the challenge, so we're open-sourcing the idea, as well as the code we worked on.  There are lots of TODOs, and the code isn't always clean, so WYSIWYG and YMMV.  We hope this work inspires someone somewhere to innovate with the idea of neural risk modeling.
 
 ### Introduction and Proposal Document
 https://docs.google.com/document/d/1BD6ZXB6OSEE-FoJjtsitb5cR36fBKpO5K11O08kOHwU/edit?usp=sharing
